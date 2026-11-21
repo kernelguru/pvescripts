@@ -31,6 +31,8 @@ enum SSHConnectError: LocalizedError {
     }
 }
 
+struct HostKeyRejected: Error {}
+
 /// Trust-On-First-Use-Prüfung des Host-Schlüssels.
 final class TOFUHostKeyValidator: NIOSSHClientServerAuthenticationDelegate, @unchecked Sendable {
     enum Outcome { case pending, trusted, unknown(String), mismatch(String) }
@@ -53,11 +55,11 @@ final class TOFUHostKeyValidator: NIOSSHClientServerAuthenticationDelegate, @unc
                 validationCompletePromise.succeed(())
             } else {
                 lock.withLock { _outcome = .mismatch(presented) }
-                validationCompletePromise.fail(InvalidHostKey())
+                validationCompletePromise.fail(HostKeyRejected())
             }
         } else {
             lock.withLock { _outcome = .unknown(presented) }
-            validationCompletePromise.fail(InvalidHostKey())
+            validationCompletePromise.fail(HostKeyRejected())
         }
     }
 

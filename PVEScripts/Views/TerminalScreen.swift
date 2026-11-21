@@ -15,11 +15,11 @@ struct TerminalScreen: View {
             VStack(spacing: 0) {
                 statusBar
                 TerminalHostView(session: session, fontSize: settings.terminalFontSize, focus: keyboardFocus)
-                    .background(Color.black)
+                    .background(SwiftUI.Color.black)
                     .ignoresSafeArea(.container, edges: .bottom)
                 KeyBar(session: session, focus: keyboardFocus)
             }
-            .background(Color.black)
+            .background(SwiftUI.Color.black)
             .navigationTitle(session.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -98,10 +98,10 @@ struct TerminalScreen: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color(white: 0.08))
+        .background(SwiftUI.Color(white: 0.08))
     }
 
-    private var statusColor: Color {
+    private var statusColor: SwiftUI.Color {
         switch session.state {
         case .connected: .green
         case .connecting: .yellow
@@ -127,7 +127,7 @@ final class KeyboardFocus {
 
     func toggle() {
         guard let view else { return }
-        if view.isFirstResponder { view.resignFirstResponder() } else { view.becomeFirstResponder() }
+        if view.isFirstResponder { _ = view.resignFirstResponder() } else { _ = view.becomeFirstResponder() }
     }
 }
 
@@ -149,7 +149,7 @@ struct TerminalHostView: UIViewRepresentable {
         view.inputAccessoryView = nil
         focus.view = view
         session.terminalView = view
-        DispatchQueue.main.async { view.becomeFirstResponder() }
+        DispatchQueue.main.async { _ = view.becomeFirstResponder() }
         return view
     }
 
@@ -230,7 +230,7 @@ struct KeyBar: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
         }
-        .background(Color(white: 0.1))
+        .background(SwiftUI.Color(white: 0.1))
         .disabled(session.state != .connected)
         .opacity(session.state == .connected ? 1 : 0.5)
     }
@@ -250,7 +250,7 @@ struct KeyBar: View {
                 .font(.callout.monospaced().weight(.medium))
                 .frame(minWidth: 44, minHeight: 36)
                 .padding(.horizontal, 4)
-                .background(Color(white: 0.22), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(SwiftUI.Color(white: 0.22), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .foregroundStyle(.white)
         }
         .buttonStyle(.plain)
@@ -264,7 +264,7 @@ struct KeyBar: View {
             Image(systemName: systemImage)
                 .font(.callout.weight(.medium))
                 .frame(minWidth: 44, minHeight: 36)
-                .background(Color(white: 0.22), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(SwiftUI.Color(white: 0.22), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .foregroundStyle(.white)
         }
         .buttonStyle(.plain)

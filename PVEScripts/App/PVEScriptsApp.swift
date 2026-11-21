@@ -23,6 +23,9 @@ final class AppSettings: ObservableObject {
     @AppStorage("showDevScripts") var showDevScripts = false
     @AppStorage("showDisabledScripts") var showDisabledScripts = false
     @AppStorage("terminalFontSize") var terminalFontSize: Double = 11
+    /// Schrift automatisch verkleinern, damit die Script-Menüs genug Spalten haben.
+    @AppStorage("terminalFitToWidth") var fitToWidth = true
+    @AppStorage("terminalMinColumns") var minColumns = 80
     @AppStorage("acceptedDisclaimer") var acceptedDisclaimer = false
 }
 

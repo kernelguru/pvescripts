@@ -14,7 +14,10 @@ struct TerminalScreen: View {
         NavigationStack {
             VStack(spacing: 0) {
                 statusBar
-                TerminalHostView(session: session, fontSize: settings.terminalFontSize, focus: keyboardFocus)
+                TerminalHostView(session: session,
+                                 fontSize: settings.terminalFontSize,
+                                 minColumns: settings.fitToWidth ? settings.minColumns : 0,
+                                 focus: keyboardFocus)
                     .background(SwiftUI.Color.black)
                     .ignoresSafeArea(.container, edges: .bottom)
                 KeyBar(session: session, focus: keyboardFocus)
@@ -134,29 +137,23 @@ final class KeyboardFocus {
 struct TerminalHostView: UIViewRepresentable {
     let session: TerminalSession
     let fontSize: Double
+    let minColumns: Int
     let focus: KeyboardFocus
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session) }
 
-    func makeUIView(context: Context) -> TerminalView {
-        let view = TerminalView(frame: .zero, font: UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular))
+    func makeUIView(context: Context) -> TerminalContainerView {
+        let container = TerminalContainerView(preferredFontSize: fontSize, minColumns: minColumns)
+        let view = container.terminal
         view.terminalDelegate = context.coordinator
-        view.nativeBackgroundColor = .black
-        view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
-        view.backgroundColor = .black
-        view.optionAsMetaKey = true
-        // Eigene Tastenleiste (KeyBar) statt der SwiftTerm-Zubehörleiste.
-        view.inputAccessoryView = nil
         focus.view = view
         session.terminalView = view
         DispatchQueue.main.async { _ = view.becomeFirstResponder() }
-        return view
+        return container
     }
 
-    func updateUIView(_ view: TerminalView, context: Context) {
-        if abs(view.font.pointSize - fontSize) > 0.1 {
-            view.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        }
+    func updateUIView(_ container: TerminalContainerView, context: Context) {
+        container.update(preferredFontSize: fontSize, minColumns: minColumns)
     }
 
     final class Coordinator: NSObject, TerminalViewDelegate {
@@ -199,6 +196,74 @@ struct TerminalHostView: UIViewRepresentable {
         func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
 
         func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
+    }
+}
+
+/// Hält die TerminalView und verkleinert die Schrift so weit, dass mindestens
+/// `minColumns` Spalten in die Breite passen (die Script-Menüs brauchen ≥ 60, meist 80).
+final class TerminalContainerView: UIView {
+    let terminal: TerminalView
+    private var preferredFontSize: Double
+    private var minColumns: Int
+    private static let minimumFontSize: CGFloat = 5
+
+    init(preferredFontSize: Double, minColumns: Int) {
+        self.preferredFontSize = preferredFontSize
+        self.minColumns = minColumns
+        terminal = TerminalView(frame: .zero,
+                                font: UIFont.monospacedSystemFont(ofSize: preferredFontSize, weight: .regular))
+        super.init(frame: .zero)
+        backgroundColor = .black
+        terminal.nativeBackgroundColor = .black
+        terminal.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
+        terminal.backgroundColor = .black
+        terminal.optionAsMetaKey = true
+        // Eigene Tastenleiste (KeyBar) statt der SwiftTerm-Zubehörleiste.
+        terminal.inputAccessoryView = nil
+        addSubview(terminal)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }
+
+    func update(preferredFontSize: Double, minColumns: Int) {
+        guard preferredFontSize != self.preferredFontSize || minColumns != self.minColumns else { return }
+        self.preferredFontSize = preferredFontSize
+        self.minColumns = minColumns
+        applyFont()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Schrift vor dem Frame setzen, damit die PTY nur einmal die endgültige Größe bekommt.
+        applyFont(for: bounds.width)
+        if terminal.frame != bounds { terminal.frame = bounds }
+    }
+
+    private func applyFont(for width: CGFloat? = nil) {
+        let width = width ?? bounds.width
+        guard width > 0 else { return }
+        let size = fittingFontSize(for: width)
+        if abs(terminal.font.pointSize - size) > 0.05 {
+            terminal.font = UIFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        }
+    }
+
+    /// Größte Schrift ≤ Wunschgröße, bei der `minColumns` Zellen in `width` passen.
+    private func fittingFontSize(for width: CGFloat) -> CGFloat {
+        let preferred = CGFloat(preferredFontSize)
+        guard minColumns > 0 else { return preferred }
+        var size = preferred
+        while size > Self.minimumFontSize {
+            if Int(width / Self.cellWidth(for: size)) >= minColumns { break }
+            size -= 0.25
+        }
+        return max(size, Self.minimumFontSize)
+    }
+
+    /// Gleiche Messung wie SwiftTerm (Breite von "W").
+    private static func cellWidth(for size: CGFloat) -> CGFloat {
+        let font = UIFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        return max(1, ("W" as NSString).size(withAttributes: [.font: font]).width)
     }
 }
 

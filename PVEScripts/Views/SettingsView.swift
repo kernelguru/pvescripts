@@ -36,6 +36,12 @@ struct SettingsView: View {
                     Stepper(value: $settings.terminalFontSize, in: 7...20, step: 0.5) {
                         LabeledContent("Schriftgröße", value: String(format: "%.1f pt", settings.terminalFontSize))
                     }
+                    Toggle("Schrift an Breite anpassen", isOn: $settings.fitToWidth)
+                    if settings.fitToWidth {
+                        Stepper(value: $settings.minColumns, in: 60...160, step: 10) {
+                            LabeledContent("Mindestens Spalten", value: "\(settings.minColumns)")
+                        }
+                    }
                     Text("root@pve:~# bash -c \"$(curl …)\"")
                         .font(.system(size: settings.terminalFontSize, design: .monospaced))
                         .foregroundStyle(.green)
@@ -45,7 +51,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Terminal")
                 } footer: {
-                    Text("Whiptail-Menüs brauchen ca. 80 Spalten. Im Querformat oder mit kleinerer Schrift werden sie vollständig angezeigt.")
+                    Text("Die Script-Menüs brauchen mindestens 60, besser 80 Spalten. Mit „An Breite anpassen“ wird die Schrift im Hochformat automatisch so weit verkleinert; die Schriftgröße oben ist dann die Obergrenze.")
                 }
 
                 Section("Tipps") {

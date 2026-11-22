@@ -337,6 +337,49 @@ struct PVEClient {
         return ticket
     }
 
+    // MARK: Passthrough
+
+    /// Nicht-interaktiver Befehl auf einem bestimmten Cluster-Node.
+    func runOnNode(_ node: String, _ command: String) async throws -> String {
+        let local = try await localNodeName()
+        if local == node { return try await run(command) }
+        return try await run("ssh -o BatchMode=yes root@\(node) \(CommandBuilder.shellQuote(command))")
+    }
+
+    func pciDevices(node: String) async throws -> [PCIDevice] {
+        let list: [PCIDevice] = try await get("/nodes/\(node)/hardware/pci")
+        return list.sorted { $0.id < $1.id }
+    }
+
+    func usbDevices(node: String) async throws -> [USBDevice] {
+        let list: [USBDevice] = try await get("/nodes/\(node)/hardware/usb")
+        return list.filter { !$0.isHub }.sorted { $0.id < $1.id }
+    }
+
+    func passthroughCheck(node: String) async throws -> PassthroughCheck {
+        PassthroughCheck(output: try await runOnNode(node, PassthroughCheck.script))
+    }
+
+    /// Treiber, der das PCI-Gerät auf dem Host gerade verwendet (z. B. nvidia, vfio-pci).
+    func pciDriver(node: String, id: String) async -> String? {
+        let output = try? await runOnNode(node, "lspci -k -s \(CommandBuilder.shellQuote(id))")
+        guard let line = output?.split(separator: "\n").first(where: { $0.contains("Kernel driver in use:") }) else { return nil }
+        return line.components(separatedBy: ":").last?.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Gerätedateien, die sich in Container durchreichen lassen.
+    func hostDeviceNodes(node: String) async throws -> [String] {
+        let command = "ls -1d /dev/dri/* /dev/ttyUSB* /dev/ttyACM* /dev/serial/by-id/* /dev/net/tun /dev/kfd /dev/nvidia* /dev/apex_* /dev/accel/* 2>/dev/null; true"
+        let output = try await runOnNode(node, command)
+        return output.split(separator: "\n").map(String.init).filter { $0.hasPrefix("/dev/") && !$0.hasSuffix("/by-path") }
+    }
+
+    /// Cluster-weite Ressourcen-Zuordnungen (PVE 8+).
+    func mappings(_ kind: String) async -> [String] {
+        guard let json = try? await getJSON("/cluster/mapping/\(kind)") else { return [] }
+        return json.arrayValue.compactMap { $0["id"]?.stringValue }.sorted()
+    }
+
     /// Befehl, der auf dem richtigen Cluster-Node läuft (für interaktive Konsolen).
     func commandOnNode(_ node: String, _ command: String) async -> String {
         let local = (try? await localNodeName()) ?? node

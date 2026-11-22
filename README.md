@@ -37,6 +37,12 @@ direkt per SSH auf deinem Proxmox-Host installieren kannst.
   - **Bearbeiten inkl. Hardware**: CPU, RAM, Ballooning, Disks hinzufügen/vergrößern/
     aushängen, Netzwerkkarten, CD/DVD, Optionen (Autostart, Schutz, Tags, Notizen,
     Nesting) und Experten-Editor für alle Config-Schlüssel
+  - **Durchreichen**: PCI-Geräte/GPUs (alle Funktionen, Primäre GPU, PCIe, ROM-Bar, Cluster-
+    Zuordnungen), USB nach Geräte-ID/Port/Zuordnung, Gerätedateien für Container (`/dev/dri`,
+    Zigbee-/Z-Wave-Sticks, `/dev/net/tun`) mit Schnellauswahl
+  - **Passthrough-Check pro Node**: IOMMU, Interrupt-Remapping, vfio-Module, Bootloader,
+    IOMMU-Gruppen und Host-Treiber; Einrichtungsskript (Kernel-Parameter, vfio, optional
+    GPU an vfio-pci binden) mit Vorschau, Ausführung im Terminal und Node-Neustart
   - Snapshots (inkl. RAM), Backup jetzt, Klonen, Löschen, Task-Liste mit Live-Log
   - **QEMU-Gast-Agent**: aktivieren, VM aus/ein schalten, per SSH im Gast installieren
     (apt/dnf/yum/zypper/apk/pacman) oder Befehle kopieren; Hinweis für Windows

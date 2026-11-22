@@ -147,6 +147,13 @@ struct NodeDashboardView: View {
                 } label: {
                     Label("Aufgaben (Tasks)", systemImage: "list.bullet.rectangle")
                 }
+                ForEach(nodes.filter(\.isOnline)) { node in
+                    NavigationLink {
+                        HostPassthroughView(host: host, node: node.node)
+                    } label: {
+                        Label(nodes.count > 1 ? "PCI/GPU-Passthrough (\(node.node))" : "PCI/GPU-Passthrough", systemImage: "checkmark.shield")
+                    }
+                }
             }
 
             Section {

@@ -507,6 +507,14 @@ struct GuestConfig {
 
     var netKeys: [String] { sortedKeys.filter { Self.matches(Self.netPattern, $0) } }
 
+    static let pciPattern = try! NSRegularExpression(pattern: "^hostpci\\d+$")
+    static let usbPattern = try! NSRegularExpression(pattern: "^usb\\d+$")
+    static let devPattern = try! NSRegularExpression(pattern: "^dev\\d+$")
+
+    var pciKeys: [String] { sortedKeys.filter { Self.matches(Self.pciPattern, $0) } }
+    var usbKeys: [String] { sortedKeys.filter { Self.matches(Self.usbPattern, $0) } }
+    var deviceKeys: [String] { sortedKeys.filter { Self.matches(Self.devPattern, $0) } }
+
     func isCDROM(_ key: String) -> Bool {
         guard let value = values[key] else { return false }
         return value.contains("media=cdrom")
@@ -547,4 +555,178 @@ extension KeyedDecodingContainer {
         if let s = try? decodeIfPresent(String.self, forKey: key) { return Double(s) }
         return nil
     }
+}
+
+// MARK: - Passthrough
+
+struct PCIDevice: Decodable, Identifiable, Hashable {
+    var id: String              // 0000:01:00.0
+    var classCode: String       // 0x030000
+    var vendor: String          // 0x10de
+    var device: String
+    var vendorName: String?
+    var deviceName: String?
+    var subsystemName: String?
+    var iommuGroup: Int
+    var mdev: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, vendor, device, mdev
+        case classCode = "class"
+        case vendorName = "vendor_name"
+        case deviceName = "device_name"
+        case subsystemName = "subsystem_device_name"
+        case iommuGroup = "iommugroup"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lossyString(.id) ?? "?"
+        classCode = (c.lossyString(.classCode) ?? "").lowercased()
+        vendor = (c.lossyString(.vendor) ?? "").lowercased()
+        device = (c.lossyString(.device) ?? "").lowercased()
+        vendorName = c.lossyString(.vendorName)
+        deviceName = c.lossyString(.deviceName)
+        subsystemName = c.lossyString(.subsystemName)
+        iommuGroup = c.lossyInt(.iommuGroup) ?? -1
+        mdev = c.lossyBool(.mdev) ?? false
+    }
+
+    /// "0000:01:00" – alle Funktionen des Geräts.
+    var slot: String { id.components(separatedBy: ".").first ?? id }
+    var function: String { id.components(separatedBy: ".").last ?? "0" }
+    /// "10de:2484" für vfio-pci ids=
+    var vendorDevice: String {
+        func strip(_ s: String) -> String { s.hasPrefix("0x") ? String(s.dropFirst(2)) : s }
+        return "\(strip(vendor)):\(strip(device))"
+    }
+    private var classPrefix: String {
+        let c = classCode.hasPrefix("0x") ? String(classCode.dropFirst(2)) : classCode
+        return String(c.prefix(4))
+    }
+    var isGPU: Bool { classPrefix.hasPrefix("03") }
+    var isAudio: Bool { classPrefix == "0403" }
+    var category: String {
+        switch String(classPrefix.prefix(2)) {
+        case "03": return "Grafik"
+        case "02": return "Netzwerk"
+        case "01": return "Storage"
+        case "04": return "Multimedia"
+        case "0c": return classPrefix == "0c03" ? "USB-Controller" : "Serieller Bus"
+        case "08": return "System"
+        case "12": return "Beschleuniger"
+        default: return "Sonstige"
+        }
+    }
+    var symbol: String {
+        switch category {
+        case "Grafik": "display"
+        case "Netzwerk": "network"
+        case "Storage": "internaldrive"
+        case "Multimedia": "speaker.wave.2"
+        case "USB-Controller": "cable.connector"
+        default: "cpu"
+        }
+    }
+    var title: String { deviceName ?? "Gerät \(vendorDevice)" }
+}
+
+struct USBDevice: Decodable, Identifiable, Hashable {
+    var busnum: Int
+    var devnum: Int
+    var port: Int
+    var usbpath: String?
+    var vendid: String
+    var prodid: String
+    var manufacturer: String?
+    var product: String?
+    var speed: String?
+    var usbClass: Int
+
+    var id: String { "\(busnum)-\(devnum)" }
+    var deviceID: String {
+        func strip(_ s: String) -> String { (s.hasPrefix("0x") ? String(s.dropFirst(2)) : s).lowercased() }
+        return "\(strip(vendid)):\(strip(prodid))"
+    }
+    var portID: String { "\(busnum)-\(usbpath ?? String(port))" }
+    var isHub: Bool { usbClass == 9 }
+    var title: String {
+        let name = [manufacturer, product].compactMap { $0 }.joined(separator: " ")
+        return name.isEmpty ? "USB-Gerät \(deviceID)" : name
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case busnum, devnum, port, usbpath, vendid, prodid, manufacturer, product, speed
+        case usbClass = "class"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        busnum = c.lossyInt(.busnum) ?? 0
+        devnum = c.lossyInt(.devnum) ?? 0
+        port = c.lossyInt(.port) ?? 0
+        usbpath = c.lossyString(.usbpath)
+        vendid = c.lossyString(.vendid) ?? ""
+        prodid = c.lossyString(.prodid) ?? ""
+        manufacturer = c.lossyString(.manufacturer)
+        product = c.lossyString(.product)
+        speed = c.lossyString(.speed)
+        usbClass = c.lossyInt(.usbClass) ?? 0
+    }
+}
+
+/// Ergebnis der Passthrough-Prüfung eines Hosts.
+struct PassthroughCheck {
+    var cpuVendor: String = ""
+    var cmdline: String = ""
+    var iommuGroups: Int = 0
+    var iommuMessages: Int = 0
+    var interruptRemapping: Bool = false
+    var modules: [String: Bool] = [:]
+    var bootloader: String = ""
+    var pveVersion: String = ""
+    var vfioConfig: String = ""
+
+    init() {}
+
+    init(output: String) {
+        for line in output.split(separator: "\n") {
+            let parts = line.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { continue }
+            let (key, value) = (parts[0], parts[1].trimmingCharacters(in: .whitespaces))
+            switch key {
+            case "cpu": cpuVendor = value
+            case "cmdline": cmdline = value
+            case "groups": iommuGroups = Int(value) ?? 0
+            case "iommu_msgs": iommuMessages = Int(value) ?? 0
+            case "remap": interruptRemapping = (Int(value) ?? 0) > 0
+            case "boot": bootloader = value
+            case "pve": pveVersion = value
+            case "vfio_conf": vfioConfig = value
+            default:
+                if key.hasPrefix("mod_") { modules[String(key.dropFirst(4))] = value == "1" }
+            }
+        }
+    }
+
+    var isIntel: Bool { cpuVendor == "GenuineIntel" }
+    var isAMD: Bool { cpuVendor == "AuthenticAMD" }
+    var iommuActive: Bool { iommuGroups > 0 }
+    var hasIntelParam: Bool { cmdline.contains("intel_iommu=on") }
+    var hasPassthroughParam: Bool { cmdline.contains("iommu=pt") }
+    var vfioLoaded: Bool { ["vfio", "vfio_iommu_type1", "vfio_pci"].allSatisfy { modules[$0] == true } }
+    var kernelParamsOK: Bool { isIntel ? hasIntelParam : true }
+    var ready: Bool { iommuActive && vfioLoaded }
+
+    static let script = """
+    echo "cpu=$(grep -m1 vendor_id /proc/cpuinfo | awk '{print $3}')"
+    echo "cmdline=$(cat /proc/cmdline)"
+    echo "groups=$(ls /sys/kernel/iommu_groups 2>/dev/null | wc -l)"
+    echo "iommu_msgs=$(dmesg 2>/dev/null | grep -ciE 'DMAR: IOMMU enabled|AMD-Vi|iommu: Default domain')"
+    echo "remap=$(dmesg 2>/dev/null | grep -ciE 'remapping.*enabled|x2apic enabled')"
+    for m in vfio vfio_iommu_type1 vfio_pci; do if grep -q "^$m " /proc/modules || [ -d /sys/module/$m ]; then echo "mod_$m=1"; else echo "mod_$m=0"; fi; done
+    if [ -f /etc/kernel/cmdline ]; then echo boot=systemd-boot; else echo boot=grub; fi
+    echo "pve=$(pveversion 2>/dev/null | cut -d/ -f2)"
+    echo "vfio_conf=$(cat /etc/modprobe.d/vfio*.conf 2>/dev/null | tr '\\n' ';')"
+    """
 }

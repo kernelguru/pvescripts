@@ -24,11 +24,15 @@ struct GuestDetailView: View {
     enum SheetKind: Identifiable {
         case cpuMemory, options, addDisk, addNetwork, editNetwork(String), resize(String), cdrom(String)
         case clone, backup, agent, raw
+        case pci(String?), usb(String?), lxcDevice(String?)
         var id: String {
             switch self {
             case .editNetwork(let k): "net-\(k)"
             case .resize(let k): "resize-\(k)"
             case .cdrom(let k): "cd-\(k)"
+            case .pci(let k): "pci-\(k ?? "neu")"
+            case .usb(let k): "usb-\(k ?? "neu")"
+            case .lxcDevice(let k): "dev-\(k ?? "neu")"
             default: String(describing: self)
             }
         }
@@ -326,6 +330,9 @@ struct GuestDetailView: View {
                     }
                 }
                 Button("Netzwerkkarte hinzufügen", systemImage: "plus.circle") { sheet = .addNetwork }
+            }
+            passthroughSection(config)
+            Section("System") {
 
                 if isVM {
                     LabeledContent("BIOS", value: config["bios"] == "ovmf" ? "OVMF (UEFI)" : "SeaBIOS")
@@ -371,6 +378,56 @@ struct GuestDetailView: View {
             }
         }
         .foregroundStyle(.primary)
+    }
+
+    @ViewBuilder
+    private func passthroughSection(_ config: GuestConfig) -> some View {
+        Section {
+            if isVM {
+                ForEach(config.pciKeys, id: \.self) { key in
+                    passthroughRow(key, value: config[key] ?? "", symbol: "display") { sheet = .pci(key) }
+                }
+                ForEach(config.usbKeys, id: \.self) { key in
+                    passthroughRow(key, value: config[key] ?? "", symbol: "cable.connector") { sheet = .usb(key) }
+                }
+                Button("PCI-Gerät / GPU hinzufügen", systemImage: "plus.circle") { sheet = .pci(nil) }
+                Button("USB-Gerät hinzufügen", systemImage: "plus.circle") { sheet = .usb(nil) }
+            } else {
+                ForEach(config.deviceKeys, id: \.self) { key in
+                    passthroughRow(key, value: config[key] ?? "", symbol: "cpu") { sheet = .lxcDevice(key) }
+                }
+                Button("Gerät hinzufügen (GPU, USB, TUN …)", systemImage: "plus.circle") { sheet = .lxcDevice(nil) }
+            }
+            if let host {
+                NavigationLink {
+                    HostPassthroughView(host: host, node: guest.node)
+                } label: {
+                    Label("Host prüfen & einrichten", systemImage: "checkmark.shield")
+                }
+            }
+        } header: {
+            Text("Durchgereichte Geräte")
+        } footer: {
+            Text(isVM
+                 ? "PCI-Geräte (z. B. GPUs) erfordern aktives IOMMU auf dem Host und einen vollständigen Neustart der VM."
+                 : "Gerätedateien des Hosts (z. B. /dev/dri für Hardware-Transcoding oder USB-Sticks) im Container verfügbar machen.")
+        }
+    }
+
+    private func passthroughRow(_ key: String, value: String, symbol: String, edit: @escaping () -> Void) -> some View {
+        Button(action: edit) {
+            LabeledContent {
+                Text(value).font(.caption.monospaced()).lineLimit(2).multilineTextAlignment(.trailing)
+            } label: {
+                Label(key, systemImage: symbol)
+            }
+        }
+        .foregroundStyle(.primary)
+        .swipeActions {
+            Button("Entfernen", role: .destructive) {
+                updateConfig("\(key) wird entfernt …", set: [], delete: [key], needsRestart: true)
+            }
+        }
     }
 
     private var optionsSection: some View {
@@ -452,6 +509,12 @@ struct GuestDetailView: View {
             CDROMEditor(client: client, guest: guest, config: config, key: key, onSave: done)
         case .raw:
             RawConfigEditor(client: client, guest: guest, config: config, onSave: done)
+        case .pci(let key):
+            PCIPassthroughEditor(client: client, guest: guest, config: config, key: key, onSave: done)
+        case .usb(let key):
+            USBPassthroughEditor(client: client, guest: guest, config: config, key: key, onSave: done)
+        case .lxcDevice(let key):
+            LXCDeviceEditor(client: client, guest: guest, config: config, key: key, onSave: done)
         case .clone:
             CloneEditor(client: client, guest: guest) { upid in
                 if let upid { showTask(TaskRef(upid: upid, title: "Klonen")) }

@@ -24,8 +24,23 @@ direkt per SSH auf deinem Proxmox-Host installieren kannst.
 - **Hosts**: mehrere Proxmox-Hosts, Passwort oder SSH-Schlüssel (Ed25519/RSA,
   OpenSSH-Format, optional mit Passphrase), Trust-On-First-Use für Host-Schlüssel mit
   SHA256-Fingerprint, Zugangsdaten nur im iOS-Schlüsselbund
-- **Container & VMs** pro Host (über `pvesh`): Start/Stop/Reboot, Konsole
-  (`pct enter`), Community-Script-`update` im Container, Host-Shell, `apt dist-upgrade`
+- **Proxmox-Admin** (über `pvesh` per SSH – kein API-Token nötig, clusterweit):
+  - Dashboard pro Node: CPU, RAM, Root-Disk, Swap, Load, Version, Storage-Belegung,
+    automatische Aktualisierung
+  - Gäste-Liste mit Filter/Suche, Live-Auslastung, Start/Stopp per Wischgeste
+  - Detailansicht: Starten, Herunterfahren, Neustarten, Pausieren/Fortsetzen, hart Stoppen,
+    Live-Ressourcen (CPU, RAM, Disk, Netz, I/O), **IP-Adressen** (QEMU-Agent bzw. LXC)
+  - **Konsolen**: serielle Konsole (`qm terminal`), LXC-Konsole/Root-Shell, **noVNC**
+    über die Weboberfläche mit automatischer Anmeldung
+  - **Neue VMs/Container**: ISO bzw. Vorlage wählen, ISO per URL laden,
+    LXC-Vorlagen herunterladen, CPU/RAM/Disk/Netz, UEFI/TPM für Windows 11
+  - **Bearbeiten inkl. Hardware**: CPU, RAM, Ballooning, Disks hinzufügen/vergrößern/
+    aushängen, Netzwerkkarten, CD/DVD, Optionen (Autostart, Schutz, Tags, Notizen,
+    Nesting) und Experten-Editor für alle Config-Schlüssel
+  - Snapshots (inkl. RAM), Backup jetzt, Klonen, Löschen, Task-Liste mit Live-Log
+  - **QEMU-Gast-Agent**: aktivieren, VM aus/ein schalten, per SSH im Gast installieren
+    (apt/dnf/yum/zypper/apk/pacman) oder Befehle kopieren; Hinweis für Windows
+  - Host-Shell und `apt dist-upgrade`, Community-Script-`update` in Containern
 
 ## Projektstruktur
 
@@ -102,6 +117,11 @@ starten. Voraussetzung: Xcode 16 oder neuer, iOS 17+.
   `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`
 
 ## Hinweise
+
+- noVNC nutzt die Weboberfläche auf Port 8006. Bei selbst signiertem Zertifikat
+  akzeptiert die App das Zertifikat nur für den eingetragenen Host. Bleibt die Konsole
+  schwarz, blockiert iOS ggf. die WebSocket-Verbindung – dann ein gültiges Zertifikat
+  (z. B. ACME/Let's Encrypt in Proxmox) einrichten oder die serielle Konsole nutzen.
 
 - Die Scripts laufen mit root-Rechten auf deinem Host. Lies den Quellcode
   (Link auf jeder Detailseite), bevor du etwas installierst.

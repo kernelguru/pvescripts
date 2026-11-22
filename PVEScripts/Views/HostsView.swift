@@ -58,7 +58,7 @@ struct HostsView: View {
             }
             .navigationTitle("Hosts")
             .navigationDestination(for: UUID.self) { id in
-                HostDetailView(hostID: id)
+                NodeDashboardView(hostID: id)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -238,6 +238,7 @@ struct HostEditView: View {
         var creds = credentials
         if h.authMethod == .password { creds.privateKey = ""; creds.passphrase = "" } else { creds.password = "" }
         hosts.upsert(h, credentials: creds)
+        Task { await SSHPool.shared.drop(h.id) }
         onSave?(h)
         dismiss()
     }
@@ -247,7 +248,7 @@ struct HostEditView: View {
         var h = normalizedHost()
         let creds = credentials
         do {
-            let info = try await GuestService.hostInfo(host: h, credentials: creds)
+            let info = try await PVEClient.testConnection(host: h, credentials: creds)
             testState = .success(info.isEmpty ? "Verbunden" : info)
         } catch SSHConnectError.unknownHostKey(let key, _) {
             // Der Test wurde explizit angefordert: Schlüssel übernehmen (TOFU) und
@@ -255,7 +256,7 @@ struct HostEditView: View {
             h.trustedHostKey = key
             host.trustedHostKey = key
             do {
-                let info = try await GuestService.hostInfo(host: h, credentials: creds)
+                let info = try await PVEClient.testConnection(host: h, credentials: creds)
                 testState = .success((info.isEmpty ? "Verbunden" : info) + "\nHost-Schlüssel übernommen – Fingerprint unten prüfen.")
             } catch {
                 testState = .failure(error.localizedDescription)

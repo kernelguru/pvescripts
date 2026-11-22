@@ -209,7 +209,7 @@ struct InstallView: View {
         guestError = nil
         defer { loadingGuests = false }
         do {
-            guests = try await GuestService.listGuests(host: host)
+            guests = try await PVEClient(host: host).guests().filter { !$0.isTemplate }
         } catch {
             guestError = error.localizedDescription
         }

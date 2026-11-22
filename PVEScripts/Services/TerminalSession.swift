@@ -46,10 +46,14 @@ final class TerminalSession: ObservableObject, Identifiable {
     /// Callback, um einen neu vertrauten Host-Schlüssel zu speichern.
     var onTrustHostKey: ((String) -> Void)?
 
-    init(host: ProxmoxHost, title: String, initialCommand: String?) {
+    /// Zugangsdaten für temporäre Ziele (z. B. SSH direkt in eine VM), sonst Schlüsselbund.
+    private let credentialsOverride: HostCredentials?
+
+    init(host: ProxmoxHost, title: String, initialCommand: String?, credentials: HostCredentials? = nil) {
         self.host = host
         self.title = title
         self.initialCommand = initialCommand
+        self.credentialsOverride = credentials
     }
 
     var isActive: Bool { state == .connecting || state == .connected }
@@ -61,7 +65,7 @@ final class TerminalSession: ObservableObject, Identifiable {
         state = .connecting
         var host = self.host
         if let trustedKeyOverride { host.trustedHostKey = trustedKeyOverride }
-        let credentials = HostCredentials.load(for: host.id)
+        let credentials = credentialsOverride ?? HostCredentials.load(for: host.id)
 
         feedLocal("\u{1b}[2mVerbinde mit \(host.endpoint) …\u{1b}[0m\r\n")
 

@@ -214,8 +214,9 @@ struct NodeDashboardView: View {
             }
         }
         if let status = statuses[node.node] {
-            UsageBar(title: "CPU", fraction: status.cpu,
-                     detail: "\(Fmt.percent(status.cpu)) von \(status.cpus) Threads", symbol: "cpu")
+            // CPU aus /nodes (pvestatd) – /nodes/{node}/status liefert über pvesh immer 0.
+            UsageBar(title: "CPU", fraction: node.cpu,
+                     detail: "\(Fmt.percent(node.cpu)) von \(status.cpus) Threads", symbol: "cpu")
             UsageBar(title: "RAM", fraction: status.memTotal > 0 ? status.memUsed / status.memTotal : nil,
                      detail: "\(Fmt.bytes(status.memUsed)) / \(Fmt.bytes(status.memTotal))", symbol: "memorychip")
             UsageBar(title: "Root-Disk", fraction: status.rootTotal > 0 ? status.rootUsed / status.rootTotal : nil,

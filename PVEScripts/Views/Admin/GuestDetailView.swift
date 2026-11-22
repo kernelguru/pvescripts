@@ -194,8 +194,9 @@ struct GuestDetailView: View {
             }
             let s = status
             let cpus = Int(s?.cpus ?? guest.maxcpu ?? 0)
-            UsageBar(title: "CPU", fraction: s?.cpu ?? guest.cpu,
-                     detail: "\(Fmt.percent(s?.cpu ?? guest.cpu)) von \(cpus) vCPU", symbol: "cpu")
+            // CPU aus /cluster/resources (pvestatd) – status/current liefert über pvesh immer 0.
+            UsageBar(title: "CPU", fraction: guest.cpu,
+                     detail: "\(Fmt.percent(guest.cpu)) von \(cpus) vCPU", symbol: "cpu")
             let mem = s?.mem ?? guest.mem, maxmem = s?.maxmem ?? guest.maxmem
             UsageBar(title: "RAM", fraction: (maxmem ?? 0) > 0 ? (mem ?? 0) / maxmem! : nil,
                      detail: "\(Fmt.bytes(mem)) / \(Fmt.bytes(maxmem))", symbol: "memorychip")
@@ -608,6 +609,7 @@ struct GuestDetailView: View {
         } catch {
             loadError = error.localizedDescription
         }
+        await refreshClusterValues()
         await loadAddresses()
     }
 
@@ -618,6 +620,17 @@ struct GuestDetailView: View {
             status = s
             if wasRunning != s.isRunning { await loadAddresses() }
         }
+        await refreshClusterValues()
+    }
+
+    /// CPU-Auslastung kommt aus /cluster/resources, weil pvestatd sie dort über ein
+    /// Messintervall berechnet (ein einzelner pvesh-Aufruf von status/current liefert 0).
+    private func refreshClusterValues() async {
+        guard let client, let fresh = try? await client.guests().first(where: { $0.vmid == guest.vmid }) else { return }
+        guest.cpu = fresh.cpu
+        guest.maxcpu = fresh.maxcpu
+        guest.uptime = fresh.uptime
+        guest.status = fresh.status
     }
 
     private func loadAddresses() async {

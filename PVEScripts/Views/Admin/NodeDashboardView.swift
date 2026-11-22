@@ -203,6 +203,16 @@ struct NodeDashboardView: View {
 
     @ViewBuilder
     private func nodeSummary(_ node: PVENode) -> some View {
+        if node.isOnline, let host {
+            NavigationLink {
+                MetricsView(client: PVEClient(host: host), scope: .node(node.node))
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Verlauf (CPU, RAM, Netz, Disk)", systemImage: "chart.xyaxis.line")
+                    MetricSparkline(client: PVEClient(host: host), scope: .node(node.node))
+                }
+            }
+        }
         if let status = statuses[node.node] {
             UsageBar(title: "CPU", fraction: status.cpu,
                      detail: "\(Fmt.percent(status.cpu)) von \(status.cpus) Threads", symbol: "cpu")

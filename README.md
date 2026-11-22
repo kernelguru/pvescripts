@@ -43,6 +43,9 @@ direkt per SSH auf deinem Proxmox-Host installieren kannst.
   - **Passthrough-Check pro Node**: IOMMU, Interrupt-Remapping, vfio-Module, Bootloader,
     IOMMU-Gruppen und Host-Treiber; Einrichtungsskript (Kernel-Parameter, vfio, optional
     GPU an vfio-pci binden) mit Vorschau, Ausführung im Terminal und Node-Neustart
+  - **Verlaufs-Diagramme** (Swift Charts) für Node und Gast: CPU/IO-Wait, Load, RAM, Netz,
+    Disk-I/O bzw. Belegung über Stunde/Tag/Woche/Monat/Jahr, Durchschnitt oder Maximum,
+    synchrones Fadenkreuz zum Ablesen, Mini-Vorschau in den Übersichten
   - Snapshots (inkl. RAM), Backup jetzt, Klonen, Löschen, Task-Liste mit Live-Log
   - **QEMU-Gast-Agent**: aktivieren, VM aus/ein schalten, per SSH im Gast installieren
     (apt/dnf/yum/zypper/apk/pacman) oder Befehle kopieren; Hinweis für Windows

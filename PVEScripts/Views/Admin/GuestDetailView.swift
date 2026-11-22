@@ -182,6 +182,16 @@ struct GuestDetailView: View {
 
     private var resourcesSection: some View {
         Section("Ressourcen") {
+            if let host {
+                NavigationLink {
+                    MetricsView(client: PVEClient(host: host), scope: .guest(guest))
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Verlauf (CPU, RAM, Netz, Disk)", systemImage: "chart.xyaxis.line")
+                        MetricSparkline(client: PVEClient(host: host), scope: .guest(guest))
+                    }
+                }
+            }
             let s = status
             let cpus = Int(s?.cpus ?? guest.maxcpu ?? 0)
             UsageBar(title: "CPU", fraction: s?.cpu ?? guest.cpu,
@@ -461,6 +471,13 @@ struct GuestDetailView: View {
                     SnapshotsView(client: PVEClient(host: host), guest: guest)
                 } label: {
                     Label("Snapshots", systemImage: "camera.on.rectangle")
+                }
+            }
+            if let host, !running {
+                NavigationLink {
+                    MetricsView(client: PVEClient(host: host), scope: .guest(guest))
+                } label: {
+                    Label("Verlauf (Diagramme)", systemImage: "chart.xyaxis.line")
                 }
             }
             Button("Backup jetzt …", systemImage: "archivebox") { sheet = .backup }

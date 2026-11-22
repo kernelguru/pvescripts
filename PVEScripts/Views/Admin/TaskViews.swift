@@ -138,6 +138,11 @@ struct TasksView: View {
                     }
                 }
                 .foregroundStyle(.primary)
+                .swipeActions {
+                    if task.isRunning {
+                        Button("Stoppen", role: .destructive) { stop(task) }
+                    }
+                }
             }
         }
         .navigationTitle("Aufgaben")
@@ -145,6 +150,18 @@ struct TasksView: View {
         .task { await load() }
         .sheet(item: $selected) { ref in
             TaskLogView(client: PVEClient(host: host), upid: ref.upid, title: ref.title)
+        }
+    }
+
+    private func stop(_ task: PVETask) {
+        Task {
+            do {
+                try await PVEClient(host: host).delete("/nodes/\(task.node)/tasks/\(task.upid)")
+                try? await Task.sleep(for: .seconds(1))
+            } catch {
+                self.error = error.localizedDescription
+            }
+            await load()
         }
     }
 

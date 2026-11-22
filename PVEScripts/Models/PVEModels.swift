@@ -399,7 +399,8 @@ struct PVETask: Decodable, Identifiable, Hashable {
             "vzreboot": "CT neu starten", "vzcreate": "CT erstellen", "vzdestroy": "CT löschen",
             "vzdump": "Backup", "vzsnapshot": "Snapshot", "vzrollback": "Rollback",
             "download": "Download", "aptupdate": "Paketliste aktualisieren", "qmigrate": "Migration",
-            "vncproxy": "Konsole", "vncshell": "Shell", "termproxy": "Konsole", "resize": "Disk vergrößern",
+            "vncproxy": "VNC-Konsole", "vncshell": "Node-Shell (VNC)", "termproxy": "xterm.js-Konsole",
+            "resize": "Disk vergrößern",
         ]
         let base = names[type ?? ""] ?? (type ?? "Task")
         if let id_, !id_.isEmpty { return "\(base) \(id_)" }
